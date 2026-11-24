@@ -64,6 +64,21 @@ const isMetadataRoute = createRouteMatcher([
 ]);
 
 /**
+ * Static, public content pages bypass Arcjet to cut Fluid Active CPU.
+ *
+ * Every aj.protect() call runs shield and bot analysis in-process, and these
+ * two pages are the bulk of anonymous traffic - every visitor, crawler and
+ * uptime check lands on "/". Both are prerendered, take no input and touch no
+ * user data, so shield and the rate limiter had nothing to protect: the CDN
+ * absorbs a flood of GETs to a static page better than a 50/min window does.
+ *
+ * Clerk still runs here - "/" reads auth state to swap its CTA - so this skips
+ * only Arcjet. /sign-in and /sign-up deliberately keep it: they are forms, and
+ * bot sign-ups are exactly what detectBot is for.
+ */
+const isStaticPublicPage = createRouteMatcher(["/", "/privacy"]);
+
+/**
  * Paths that only ever belong to vulnerability scanners. Answered with a bare
  * 404 before anything else runs.
  *
@@ -122,7 +137,11 @@ export default clerkMiddleware(async (auth, req) => {
     return new Response(null, { status: 404 });
   }
 
-  if (!isWebhookRoute(req) && !isMetadataRoute(req)) {
+  if (
+    !isWebhookRoute(req) &&
+    !isMetadataRoute(req) &&
+    !isStaticPublicPage(req)
+  ) {
     const decision = await aj.protect(req);
 
     // Failing open is the right call for an Arcjet outage, but it must be
