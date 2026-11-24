@@ -157,10 +157,30 @@ export default clerkMiddleware(async (auth, req) => {
   }
 });
 
+/**
+ * Which requests run this proxy at all - the biggest lever on Fluid Active CPU.
+ *
+ * In the month to 24 Nov 2026 this proxy was ~70% of the project's Active CPU
+ * (17 of ~24 min), almost none of it from signed-in use. On a deployment this
+ * quiet nearly every invocation is a cold start, so the cost is ~0.5s of
+ * module init (Clerk, Arcjet) per hit regardless of how early the handler
+ * returns - the scanner 404 below still cost 3 min for /wp-admin/install.php
+ * alone. Skipping a path here is the only way to make it free.
+ *
+ * Excluded, beyond Next internals and static assets:
+ *  - "/" and "/privacy": fully static, read no auth (see app/_LandingAuth.tsx).
+ *    Served from the CDN.
+ *  - robots.txt, sitemap.xml, opengraph-image: static metadata routes.
+ *  - Scanner probes (wp-*, xmlrpc, .git, .env, any .php): fall through to the
+ *    static 404 page. Nothing in this app ever lived there.
+ *
+ * isPublicRoute, isMetadataRoute and isScannerProbe still list these paths as
+ * a fallback if this pattern is ever loosened. proxy.matcher.test.ts pins the
+ * behaviour, including that every authed route still matches.
+ */
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    "/((?!_next|$|privacy$|robots\\.txt$|sitemap\\.xml$|opengraph-image|wp-|xmlrpc|\\.git|\\.env|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest|php)).*)",
     // Always run for API routes
     "/(api|trpc)(.*)",
   ],

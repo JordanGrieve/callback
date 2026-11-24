@@ -1,6 +1,4 @@
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Button } from "@/components/ui/button";
-import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import {
   BrainCircuit,
   FileSlidersIcon,
@@ -8,7 +6,7 @@ import {
   SpeechIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { Suspense } from "react";
+import { FooterAuth, HeaderAuth, HeroAuth } from "./_LandingAuth";
 import { PricingTable } from "./services/clerk/components/PricingTable";
 import { MAIN_CONTENT_ID } from "@/components/SkipToContent";
 
@@ -31,45 +29,11 @@ const steps = [
 ];
 
 /*
- * <Show> reads auth state, which is request-time data. Under cacheComponents
- * that blocks prerendering unless it sits inside a Suspense boundary - and
- * this is the public marketing page, the one page most worth prerendering.
- *
- * Every fallback below is the SIGNED-OUT variant, deliberately: an anonymous
- * visitor is the common case here, so the prerendered HTML is already right
- * for them, and only the signed-in minority sees a swap.
- *
- * SignInButton wraps a single child - it does NOT go inside <Button asChild>.
- * Inverting them throws "You've passed multiple children components to
- * <SignInButton/>" at render. /onboarding waits for the Clerk webhook to
- * create the users row before forwarding to /app.
+ * Fully static on purpose: nothing here reads request-time data, so "/" is
+ * served from the CDN with no function and no proxy. Do not add server auth()
+ * or <Show> here - the sign-in swaps live in _LandingAuth.tsx and resolve in
+ * the browser.
  */
-function HeaderSignIn() {
-  return (
-    <SignInButton forceRedirectUrl="/onboarding">
-      <Button>Sign in</Button>
-    </SignInButton>
-  );
-}
-
-function HeroSignIn() {
-  return (
-    <SignInButton forceRedirectUrl="/onboarding">
-      <Button size="lg">Start practising free</Button>
-    </SignInButton>
-  );
-}
-
-function FooterSignIn() {
-  return (
-    <SignInButton forceRedirectUrl="/onboarding">
-      <button className="hover:text-foreground transition-colors">
-        Sign in
-      </button>
-    </SignInButton>
-  );
-}
-
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
@@ -85,17 +49,9 @@ export default function HomePage() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Suspense fallback={<HeaderSignIn />}>
-              <Show when="signed-out">
-                <HeaderSignIn />
-              </Show>
-              <Show when="signed-in">
-                <Button asChild>
-                  <Link href="/app">Go to dashboard</Link>
-                </Button>
-                <UserButton />
-              </Show>
-            </Suspense>
+            {/* Auth state resolves in the browser so "/" stays fully static -
+                see _LandingAuth.tsx. */}
+            <HeaderAuth />
           </div>
         </div>
       </header>
@@ -113,16 +69,7 @@ export default function HomePage() {
               you&apos;re chasing, then tells you — specifically — what to fix.
             </p>
             <div className="mt-10 flex items-center justify-center gap-3">
-              <Suspense fallback={<HeroSignIn />}>
-                <Show when="signed-out">
-                  <HeroSignIn />
-                </Show>
-                <Show when="signed-in">
-                  <Button size="lg" asChild>
-                    <Link href="/app">Go to your dashboard</Link>
-                  </Button>
-                </Show>
-              </Suspense>
+              <HeroAuth />
             </div>
           </div>
         </section>
@@ -177,19 +124,7 @@ export default function HomePage() {
             >
               Privacy
             </Link>
-            <Suspense fallback={<FooterSignIn />}>
-              <Show when="signed-out">
-                <FooterSignIn />
-              </Show>
-              <Show when="signed-in">
-                <Link
-                  href="/app"
-                  className="hover:text-foreground transition-colors"
-                >
-                  Dashboard
-                </Link>
-              </Show>
-            </Suspense>
+            <FooterAuth />
           </div>
         </div>
       </footer>
