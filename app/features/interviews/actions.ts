@@ -155,6 +155,16 @@ export async function updateInterview(
     humeChatId?: string;
     duration?: string;
   },
+  /**
+   * `heartbeat: true` writes without revalidating any cache tag. The live call
+   * page syncs duration on a timer; revalidating there made every tick
+   * re-render the route and ship a fresh RSC payload back, a steady drain of
+   * Fluid Active CPU for the length of every interview. Nothing reads the
+   * duration while the call is live, and the final write on disconnect
+   * revalidates as normal. Ignored for humeChatId writes, which gate the plan
+   * limit and must always invalidate.
+   */
+  { heartbeat = false }: { heartbeat?: boolean } = {},
 ) {
   const { userId } = await getCurrentUser();
 
@@ -198,7 +208,9 @@ export async function updateInterview(
     }
   }
 
-  const updated = await updateInterviewDb(id, parsed.data);
+  const updated = await updateInterviewDb(id, parsed.data, {
+    revalidate: !heartbeat || parsed.data.humeChatId != null,
+  });
   if (updated == null) {
     return { error: true as const, message: "Interview not found" };
   }
