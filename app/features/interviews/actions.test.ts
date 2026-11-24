@@ -313,9 +313,63 @@ describe("updateInterview", () => {
     const res = await updateInterview(INTERVIEW_ID, { humeChatId: CHAT_ID });
 
     expect(res).toEqual({ error: false });
-    expect(updateInterviewDb).toHaveBeenCalledWith(INTERVIEW_ID, {
-      humeChatId: CHAT_ID,
-    });
+    expect(updateInterviewDb).toHaveBeenCalledWith(
+      INTERVIEW_ID,
+      { humeChatId: CHAT_ID },
+      { revalidate: true },
+    );
+  });
+
+  // The live-call duration sync. Revalidating on every tick re-rendered the
+  // route and shipped an RSC payload back each time.
+  it("skips cache revalidation for a duration heartbeat", async () => {
+    signedInAs(OWNER);
+    findInterview.mockResolvedValue(interviewRow() as never);
+
+    const res = await updateInterview(
+      INTERVIEW_ID,
+      { duration: "00:01:00" },
+      { heartbeat: true },
+    );
+
+    expect(res).toEqual({ error: false });
+    expect(updateInterviewDb).toHaveBeenCalledWith(
+      INTERVIEW_ID,
+      { duration: "00:01:00" },
+      { revalidate: false },
+    );
+  });
+
+  it("revalidates the final duration write", async () => {
+    signedInAs(OWNER);
+    findInterview.mockResolvedValue(interviewRow() as never);
+
+    await updateInterview(INTERVIEW_ID, { duration: "00:05:00" });
+
+    expect(updateInterviewDb).toHaveBeenCalledWith(
+      INTERVIEW_ID,
+      { duration: "00:05:00" },
+      { revalidate: true },
+    );
+  });
+
+  // humeChatId gates the plan limit; a heartbeat flag must not let that write
+  // leave the interview count cached.
+  it("always revalidates a humeChatId write, even as a heartbeat", async () => {
+    signedInAs(OWNER);
+    findInterview.mockResolvedValue(interviewRow() as never);
+
+    await updateInterview(
+      INTERVIEW_ID,
+      { humeChatId: CHAT_ID },
+      { heartbeat: true },
+    );
+
+    expect(updateInterviewDb).toHaveBeenCalledWith(
+      INTERVIEW_ID,
+      { humeChatId: CHAT_ID },
+      { revalidate: true },
+    );
   });
 
   it("refuses to overwrite an existing humeChatId", async () => {

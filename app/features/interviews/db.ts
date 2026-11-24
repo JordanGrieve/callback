@@ -19,6 +19,7 @@ export async function insertInterview(
 export async function updateInterview(
   id: string,
   interview: Partial<typeof InterviewTable.$inferInsert>,
+  { revalidate = true }: { revalidate?: boolean } = {},
 ) {
   const [newInterview] = await db
     .update(InterviewTable)
@@ -28,7 +29,7 @@ export async function updateInterview(
 
   if (newInterview == null) return null;
 
-  revalidateInterviewCache(newInterview);
+  if (revalidate) revalidateInterviewCache(newInterview);
 
   return newInterview;
 }

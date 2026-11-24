@@ -260,12 +260,19 @@ export function StartCall({
     if (interviewId == null) return;
     const intervalId = setInterval(() => {
       if (durationRef.current == null) return;
-      // Best-effort: the authoritative write happens on disconnect. Catch so a
+      // Best-effort: the authoritative write happens on disconnect. This only
+      // bounds what a crashed tab loses, so it skips cache revalidation and
+      // runs every 30s rather than 10s - each tick is a server invocation
+      // (proxy, auth, two queries) for the length of the call. Catch so a
       // transient failure does not surface as an unhandled rejection.
-      updateInterview(interviewId, { duration: durationRef.current }).catch(
-        (error) => console.error("[interview] duration sync failed", error),
+      updateInterview(
+        interviewId,
+        { duration: durationRef.current },
+        { heartbeat: true },
+      ).catch((error) =>
+        console.error("[interview] duration sync failed", error),
       );
-    }, 10000);
+    }, 30_000);
     return () => clearInterval(intervalId);
   }, [chatMetadata?.chatId, interviewId]);
 
